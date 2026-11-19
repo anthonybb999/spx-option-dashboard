@@ -555,20 +555,34 @@ def auto_evaluate_spreads_and_recommend(
 @st.cache_data(ttl=900, show_spinner="正在抓取 SPX、VIX、VIX3M 並計算 GJR-GARCH...")
 def load_market_and_garch():
   tickers = ["^GSPC", "^VIX", "^VIX3M"]
-  raw_data = yf.download(tickers, period="2y", interval="1d", progress=False)
+  raw_data = yf.download(
+      tickers, period="2y", interval="1d", progress=False, auto_adjust=False
+  )
+
+  if raw_data is None or len(raw_data) == 0:
+    raise RuntimeError(
+        "暫時未能從 yfinance 取得市場數據，請稍後按 Manage app -> Reboot"
+        " app 重試。"
+    )
 
   if isinstance(raw_data.columns, pd.MultiIndex):
-    close_spx = raw_data["Close"]["^GSPC"]
-    close_vix = raw_data["Close"]["^VIX"]
-    close_vix3m = raw_data["Close"]["^VIX3M"]
+    close_spx = raw_data["Close"].get("^GSPC")
+    close_vix = raw_data["Close"].get("^VIX")
+    close_vix3m = raw_data["Close"].get("^VIX3M")
   else:
-    close_spx = raw_data["^GSPC"]
-    close_vix = raw_data["^VIX"]
-    close_vix3m = raw_data["^VIX3M"]
+    close_spx = raw_data.get("Close", raw_data.get("^GSPC"))
+    close_vix = raw_data.get("^VIX")
+    close_vix3m = raw_data.get("^VIX3M")
 
   spx = pd.DataFrame(
       {"close": close_spx, "vix": close_vix, "vix3m": close_vix3m}
   ).dropna()
+
+  if len(spx) < 60:
+    raise RuntimeError(
+        f"有效歷史交易日不足（僅 {len(spx)} 日），未能計算完整指標與"
+        " GJR-GARCH。"
+    )
 
   spx["ema20"] = spx["close"].ewm(span=20, adjust=False).mean()
   spx["sma50"] = spx["close"].rolling(50).mean()
@@ -590,20 +604,13 @@ def load_market_and_garch():
   spx["vix_sma20"] = spx["vix"].rolling(20).mean()
   spx["vix_spike"] = (spx["vix"] - spx["vix_sma20"]) / spx["vix_sma20"] * 100
 
-  change = spx["close"].diff()
-  streak = 0
-  sign = 1 if change.iloc[-1] > 0 else -1
-  for val in reversed(change.iloc[1:]):
-    if (val > 0 and sign == 1) or (val < 0 and sign == -1):
-      streak += 1
-    else:
-      break
-  streak_type = "升" if sign == 1 else "跌"
-
   clean_spx = spx.dropna()
+  if len(clean_spx) < 2:
+    raise RuntimeError("有效收市數據不足，未能計算連續升跌。")
+
   change = clean_spx["close"].diff()
   streak = 0
-  last_diff = float(change.iloc[-1]) if len(change) > 0 else 0.0
+  last_diff = float(change.to_numpy()[-1])
   sign = 1 if last_diff >= 0 else -1
   for val in reversed(change.iloc[1:].to_numpy()):
     v = float(val)
