@@ -601,6 +601,20 @@ def load_market_and_garch():
   streak_type = "升" if sign == 1 else "跌"
 
   clean_spx = spx.dropna()
+  change = clean_spx["close"].diff()
+  streak = 0
+  last_diff = float(change.iloc[-1]) if len(change) > 0 else 0.0
+  sign = 1 if last_diff >= 0 else -1
+  for val in reversed(change.iloc[1:].to_numpy()):
+    v = float(val)
+    if np.isnan(v):
+      break
+    if (v > 0 and sign == 1) or (v < 0 and sign == -1):
+      streak += 1
+    else:
+      break
+  streak_type = "升" if sign == 1 else "跌"
+
   latest = clean_spx.iloc[-1].to_dict()
   latest["streak"] = int(streak)
   latest["streak_type"] = streak_type
