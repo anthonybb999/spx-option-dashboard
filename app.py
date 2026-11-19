@@ -548,9 +548,9 @@ def auto_evaluate_spreads_and_recommend(
 
 
 # ======================================================================
-# 2. 快取市場數據與 GJR-GARCH 預測（TTL = 15 分鐘）
+# 2. 快取市場數據與 Vol Model 預測（TTL = 15 分鐘）
 # ======================================================================
-@st.cache_data(ttl=900, show_spinner="正在抓取 SPX、VIX、VIX3M 並計算 GJR-GARCH...")
+@st.cache_data(ttl=900, show_spinner="正在抓取 SPX、VIX、VIX3M 並計算 Vol Model...")
 def load_market_and_garch():
   tickers = ["^GSPC", "^VIX", "^VIX3M"]
   raw_data = yf.download(
@@ -579,7 +579,7 @@ def load_market_and_garch():
   if len(spx) < 60:
     raise RuntimeError(
         f"有效歷史交易日不足（僅 {len(spx)} 日），未能計算完整指標與"
-        " GJR-GARCH。"
+        " Vol Model。"
     )
 
   spx["ema20"] = spx["close"].ewm(span=20, adjust=False).mean()
@@ -801,28 +801,38 @@ for d in dtes:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.0))
 
-bar_labels = ["Short Put 存活", "Short Call 存活"]
+bar_labels = ["Short Put Survival", "Short Call Survival"]
 bar_vals = [put_win, call_win]
 bar_colors = [
     "#2ecc71" if put_win >= 75 else "#e67e22",
     "#3498db" if call_win >= 75 else "#e74c3c",
 ]
 ax1.barh(bar_labels, bar_vals, color=bar_colors, height=0.45)
-ax1.axvline(75, color="navy", linestyle="--", linewidth=1.5, label="75% 防線")
+ax1.axvline(
+    75, color="navy", linestyle="--", linewidth=1.5, label="75% Line"
+)
 ax1.set_xlim(0, 100)
-ax1.set_title("75% 實戰勝率防線檢測")
+ax1.set_title("75% Win-Rate Defense Check")
 ax1.legend(loc="lower right")
 for i, v in enumerate(bar_vals):
   ax1.text(v + 1.5, i, f"{v:.1f}%", va="center", fontweight="bold")
 
 ax2.plot(
-    dte_labels, call_bounds, marker="^", color="#e74c3c", label="上方 Call 邊界"
+    dte_labels,
+    call_bounds,
+    marker="^",
+    color="#e74c3c",
+    label="Upper Call Range",
 )
-ax2.axhline(sim_price, color="black", linestyle="-.", label="SPX 現價")
+ax2.axhline(sim_price, color="black", linestyle="-.", label="SPX Spot")
 ax2.plot(
-    dte_labels, put_bounds, marker="v", color="#2ecc71", label="下方 Put 邊界"
+    dte_labels,
+    put_bounds,
+    marker="v",
+    color="#2ecc71",
+    label="Lower Put Range",
 )
-ax2.set_title("GJR-GARCH 行使價安全區間平移")
+ax2.set_title("Vol Model Strike Range Shift")
 ax2.legend(loc="best")
 ax2.grid(True, alpha=0.3)
 
@@ -861,7 +871,7 @@ if any(x is not None for x in [p_k, p_iv, p_px, c_k, c_iv, c_px]):
     iv_5d = avg_iv * math.sqrt(5.0 / 252.0)
     st.caption(
         f"Skew (Put-Call): {p_iv - c_iv:+.1f}% │ 平均 0.16Δ IV: {avg_iv:.1f}%"
-        f" vs VIX {sim_vix:.2f}% vs GJR-GARCH 年化"
+        f" vs VIX {sim_vix:.2f}% vs Vol Model 年化"
         f" {garch_ann_vol * vol_scale:.1f}% │ 5D 隱含 ±{iv_5d:.2f}% vs GARCH"
         f" 1σ ±{garch_5d_1sd_pct * vol_scale:.2f}%"
     )
@@ -872,5 +882,5 @@ if sp_rows:
   st.dataframe(pd.DataFrame(sp_rows), use_container_width=True, hide_index=True)
 
 st.caption(
-    "注：本 Dashboard 為量化分析與情景模擬工具，僅供參考，不構成投資建議。"
+    "注：本 Dashboard 為量化分析與情景模擬工具，僅供參考，不構成投資建議。作者為安東尼BB999"
 )
