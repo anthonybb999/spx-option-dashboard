@@ -817,23 +817,42 @@ ax1.legend(loc="lower right")
 for i, v in enumerate(bar_vals):
   ax1.text(v + 1.5, i, f"{v:.1f}%", va="center", fontweight="bold")
 
-ax2.plot(
-    dte_labels,
-    call_bounds,
-    marker="^",
-    color="#e74c3c",
-    label="Upper Call Range",
-)
-ax2.axhline(sim_price, color="black", linestyle="-.", label="SPX Spot")
-ax2.plot(
-    dte_labels,
-    put_bounds,
-    marker="v",
-    color="#2ecc71",
-    label="Lower Put Range",
+ax2.plot(dte_labels, call_bounds, marker="^", color="#e74c3c")
+ax2.axhline(sim_price, color="black", linestyle="-.")
+ax2.plot(dte_labels, put_bounds, marker="v", color="#2ecc71")
+
+for i, (c_val, p_val) in enumerate(zip(call_bounds, put_bounds)):
+  ax2.annotate(
+      f"{int(c_val)}",
+      (dte_labels[i], c_val),
+      textcoords="offset points",
+      xytext=(0, 8),
+      ha="center",
+      fontsize=8.5,
+      fontweight="bold",
+      color="#c0392b",
+  )
+  ax2.annotate(
+      f"{int(p_val)}",
+      (dte_labels[i], p_val),
+      textcoords="offset points",
+      xytext=(0, -14),
+      ha="center",
+      fontsize=8.5,
+      fontweight="bold",
+      color="#27ae60",
+  )
+
+ax2.text(
+    0.02,
+    0.52,
+    f"Spot: {sim_price:.0f}",
+    transform=ax2.transAxes,
+    fontsize=8.5,
+    fontweight="bold",
+    color="black",
 )
 ax2.set_title("Vol Model Strike Range Shift")
-ax2.legend(loc="best")
 ax2.grid(True, alpha=0.3)
 
 plt.tight_layout()
