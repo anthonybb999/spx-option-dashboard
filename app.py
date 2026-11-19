@@ -317,40 +317,38 @@ def derive_simulated_metrics(df_spx: pd.DataFrame, new_price: float):
   df_temp = df_spx.copy()
   df_temp.iloc[-1, df_temp.columns.get_loc("close")] = new_price
 
-  ema20 = df_temp["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-  sma50 = df_temp["close"].rolling(50).mean().iloc[-1]
-  sma200 = df_temp["close"].rolling(200).mean().iloc[-1]
+  ema20 = float(df_temp["close"].ewm(span=20, adjust=False).mean().iloc[-1])
+  sma50 = float(df_temp["close"].rolling(50).mean().iloc[-1])
+  sma200 = float(df_temp["close"].rolling(200).mean().iloc[-1])
   bias_ema20 = (new_price - ema20) / ema20 * 100.0
   trend_ma_diff = (ema20 - sma50) / sma50 * 100.0
 
   delta = df_temp["close"].diff()
-  gain = delta.where(delta > 0, 0).rolling(14).mean().iloc[-1]
-  loss = (-delta.where(delta < 0, 0)).rolling(14).mean().iloc[-1]
+  gain = float(delta.where(delta > 0, 0).rolling(14).mean().iloc[-1])
+  loss = float((-delta.where(delta < 0, 0)).rolling(14).mean().iloc[-1])
   rs = gain / (loss + 1e-9)
   rsi = 100.0 - (100.0 / (1.0 + rs))
 
-  ret_3d = (
-      (new_price - df_temp["close"].iloc[-4]) / df_temp["close"].iloc[-4]
-  ) * 100.0
+  ret_3d = float(
+      (new_price - df_temp["close"].iloc[-4])
+      / df_temp["close"].iloc[-4]
+      * 100.0
+  )
 
   streak = 0
-  change = df_temp["close"].diff()
-  sign = 1 if change.iloc[-1] > 0 else -1
-  for val in reversed(change.iloc[1:]):
-    if (val > 0 and sign == 1) or (val < 0 and sign == -1):
+  change_arr = df_temp["close"].diff().to_numpy()
+  last_diff = float(change_arr[-1]) if len(change_arr) > 0 else 0.0
+  sign = 1 if last_diff >= 0 else -1
+  for val in reversed(change_arr[1:]):
+    v = float(val)
+    if np.isnan(v):
+      break
+    if (v > 0 and sign == 1) or (v < 0 and sign == -1):
       streak += 1
     else:
       break
   streak_type = "升" if sign == 1 else "跌"
-  return (
-      float(bias_ema20),
-      float(trend_ma_diff),
-      float(rsi),
-      float(ret_3d),
-      float(sma200),
-      int(streak),
-      streak_type,
-  )
+  return bias_ema20, trend_ma_diff, rsi, ret_3d, sma200, streak, streak_type
 
 
 def auto_evaluate_spreads_and_recommend(
